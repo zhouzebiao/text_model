@@ -202,18 +202,14 @@ def _load_vocab_file(vocab_file, reserved_tokens=None):
 
 def native_to_unicode(s):
     """Convert string to unicode (required in Python 2)."""
-    try:  # Python 2
-        return s if isinstance(s, unicode) else s.decode("utf-8")
-    except NameError:  # Python 3
-        return s
+    # Python 3
+    return s
 
 
 def _unicode_to_native(s):
     """Convert string from unicode to native format (required in Python 2)."""
-    try:  # Python 2
-        return s.encode("utf-8") if isinstance(s, unicode) else s
-    except NameError:  # Python 3
-        return s
+    # Python 3
+    return s
 
 
 def _split_string_to_tokens(text):
@@ -224,7 +220,7 @@ def _split_string_to_tokens(text):
     token_start = 0
     # Classify each character in the input string
     is_alnum = [c in _ALPHANUMERIC_CHAR_SET for c in text]
-    for pos in xrange(1, len(text)):
+    for pos in range(1, len(text)):
         if is_alnum[pos] != is_alnum[pos - 1]:
             token = text[token_start:pos]
             if token != u" " or token_start == 0:
@@ -533,7 +529,7 @@ def _gen_new_subtoken_list(
 
             # Decrement count of the subtoken's prefixes (if a longer subtoken is
             # added, its prefixes lose priority to be added).
-            for end in xrange(1, subtoken_len):
+            for end in range(1, subtoken_len):
                 subtoken_counts[subtoken[:end]] -= count
 
     # Add alphabet subtokens (guarantees that all strings are encodable).

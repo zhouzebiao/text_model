@@ -15,32 +15,25 @@ def get_model(max_seq_length, config, float_type=tf.float32):
     core_model = TextCNN(config, float_type)
     output = core_model(inputs)
     model = tf.keras.Model(inputs=inputs, outputs=output)
-    return model,core_model
+    return model, core_model
 
 
 class Config(object):
-    def __init__(self,
-                 vocab_size=65536,
-                 max_seq_length=512,
-                 kernel_size=(3, 4, 5),
-                 num_filter=128,
-                 activation='relu',
-                 num_labels=2,
-                 last_activation='sigmoid',
-                 hidden_size=256,
-                 initializer_range=0.2,
-                 dropout_keep_prob=0.5
-                 ):
-        self.vocab_size = vocab_size
-        self.max_seq_length = max_seq_length
-        self.kernel_sizes = kernel_size
-        self.num_filter = num_filter
-        self.activation = activation
-        self.num_labels = num_labels
-        self.last_activation = last_activation
-        self.hidden_size = hidden_size
-        self.initializer_range = initializer_range
-        self.dropout_keep_prob = dropout_keep_prob
+    def __init__(self):
+        self.vocab_size = 32768
+        self.max_seq_length = 256
+        self.kernel_sizes = (3, 4, 5)
+        self.num_filter = 128
+        self.activation = 'relu'
+        self.num_labels = 2
+        self.last_activation = 'sigmoid'
+        self.hidden_size = 256
+        self.initializer_range = 0.2
+        self.dropout_keep_prob = 0.5
+        self.meta_data = {}
+        self.generate_threshold = 327
+        self.generate_DATA_MIN_COUNT = 6
+        self.generate_search = False
 
     @classmethod
     def from_dict(cls, json_object):
@@ -100,8 +93,7 @@ class TextCNN(tf.keras.layers.Layer, ABC):
 
 
 class Filter(tf.keras.layers.Layer, ABC):
-    def __init__(self, kernel_sizes, num_filter=128, activation='relu', num_labels=1, last_activation='sigmoid',
-                 dropout_keep_prob=0.5,**kwargs):
+    def __init__(self, kernel_sizes, num_filter, activation, num_labels, last_activation, dropout_keep_prob, **kwargs):
         super(Filter, self).__init__(**kwargs)
         self.kernel_sizes = kernel_sizes
         self.num_filter = num_filter
@@ -142,7 +134,7 @@ class Filter(tf.keras.layers.Layer, ABC):
 
 
 class EmbeddingLookup(tf.keras.layers.Layer, ABC):
-    def __init__(self, vocab_size, embedding_size=128, initializer_range=0.02, **kwargs):
+    def __init__(self, vocab_size, embedding_size, initializer_range, **kwargs):
         super(EmbeddingLookup, self).__init__(**kwargs)
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size

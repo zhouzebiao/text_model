@@ -17,19 +17,22 @@ import model_training_utils
 import math
 
 flags.DEFINE_integer('epoch', 10, 'epoch for training.')
-flags.DEFINE_integer('batch_size', 64, 'Batch size for training.')
+flags.DEFINE_integer('batch_size', 512, 'Batch size for training.')
 flags.DEFINE_string('train_example_path', './raw_data/train_example.txt', 'Path to train example for classifier.')
 flags.DEFINE_string('eval_example_path', './raw_data/eval_example.txt', 'Path to eval example for classifier.')
 flags.DEFINE_string('train_output_path', './train_data/train_output.txt', 'Path to train output for classifier.')
 flags.DEFINE_string('eval_output_path', './train_data/eval_output.txt', 'Path to eval output for classifier.')
 flags.DEFINE_string('vocab_file', './train_data/vocab.txt', 'Path to vocabulary file.')
 flags.DEFINE_string('model_dir', './checkpoint', 'checkpoint')
-flags.DEFINE_integer('steps_per_loop', 20, 'Number of steps per graph-mode loop.')
+flags.DEFINE_integer(
+    'steps_per_loop', 20,
+    'Number of steps per graph-mode loop. ')
 flags.DEFINE_float('adam_beta1', 0.9, 'optimizer_adam_beta1')
 flags.DEFINE_float('adam_beta2', 0.997, 'optimizer_adam_beta2')
 flags.DEFINE_float('optimizer_adam_epsilon', 1e-09, 'optimizer_adam_epsilon')
 flags.DEFINE_float('learning_rate', 1e-3, 'The initial learning rate for Adam.')
 flags.DEFINE_string('init_checkpoint', None, 'Initial checkpoint file')
+flags.DEFINE_boolean('generate_dataset', False, 'generate dataset')
 FLAGS = flags.FLAGS
 config = Config()
 
@@ -42,7 +45,8 @@ def generate_classifier_dataset():
                                               vocab_file=FLAGS.vocab_file,
                                               train_output_path=FLAGS.train_output_path,
                                               eval_output_path=FLAGS.eval_output_path,
-                                              max_seq_length=config.max_seq_length)
+                                              max_seq_length=config.max_seq_length,
+                                              config=config)
 
 
 def get_loss_fn():
@@ -56,26 +60,27 @@ def get_loss_fn():
     return loss_fn
 
 
-def run_customized_training(strategy,
-                            model_dir,
-                            epochs,
-                            steps_per_epoch,
-                            steps_per_loop,
-                            eval_steps,
-                            init_checkpoint,
-                            custom_callbacks=None):
-    max_seq_length = config.max_seq_length
+def run_customized_training(custom_callbacks=None):
+    train_data_size = config.meta_data['train_data_size']
+    eval_data_size = config.meta_data['eval_data_size']
+    strategy = tf.distribute.MirroredStrategy()
+    steps_per_epoch = int(train_data_size / FLAGS.batch_size / strategy.num_replicas_in_sync)
+    eval_steps = int(
+        math.ceil(eval_data_size / FLAGS.batch_size))
     global_batch_size = FLAGS.batch_size * strategy.num_replicas_in_sync
     train_input_fn = functools.partial(
         input_pipeline.create_classifier_dataset,
-        FLAGS.train_output_path,
-        seq_length=max_seq_length,
-        batch_size=global_batch_size)
+        file_path=FLAGS.train_output_path,
+        seq_length=config.max_seq_length,
+        batch_size=global_batch_size,
+        buffer_size=train_data_size,
+    )
     eval_input_fn = functools.partial(
         input_pipeline.create_classifier_dataset,
-        FLAGS.eval_output_path,
-        seq_length=max_seq_length,
+        file_path=FLAGS.eval_output_path,
+        seq_length=config.max_seq_length,
         batch_size=global_batch_size,
+        buffer_size=eval_data_size,
         is_training=False,
         drop_remainder=False)
 
@@ -94,14 +99,14 @@ def run_customized_training(strategy,
         strategy=strategy,
         model_fn=_get_classifier_model,
         loss_fn=loss_fn,
-        model_dir=model_dir,
+        model_dir=FLAGS.model_dir,
         steps_per_epoch=steps_per_epoch,
-        steps_per_loop=steps_per_loop,
-        epochs=epochs,
+        steps_per_loop=FLAGS.steps_per_loop,
+        epochs=FLAGS.epoch,
         train_input_fn=train_input_fn,
         eval_input_fn=eval_input_fn,
         eval_steps=eval_steps,
-        init_checkpoint=init_checkpoint,
+        init_checkpoint=FLAGS.init_checkpoint,
         custom_callbacks=custom_callbacks, )
 
 
@@ -112,21 +117,9 @@ def main(_):
     }
     if FLAGS.generate_dataset:
         input_meta_data = generate_classifier_dataset()
-    train_data_size = input_meta_data['train_data_size']
-    eval_data_size = input_meta_data['eval_data_size']
-    strategy = tf.distribute.MirroredStrategy()
-    steps_per_epoch = int(train_data_size / FLAGS.batch_size / strategy.num_replicas_in_sync)
-    # warm_up_steps = int(FLAGS.epoch * train_data_size * 0.1 / FLAGS.batch_size / strategy.num_replicas_in_sync)
-    eval_steps = int(
-        math.ceil(eval_data_size / FLAGS.batch_size))
-    trained_model = run_customized_training(
-        strategy,
-        FLAGS.model_dir,
-        FLAGS.epoch,
-        steps_per_epoch,
-        FLAGS.steps_per_loop,
-        eval_steps,
-        FLAGS.init_checkpoint)
+    config.meta_data = input_meta_data
+
+    run_customized_training()
 
 
 if __name__ == '__main__':

@@ -120,20 +120,14 @@ def convert_examples_to_features(examples, label_list,
     writer.close()
 
 
-_TARGET_VOCAB_SIZE = 32768
-_TARGET_THRESHOLD = 327
-_TRAIN_DATA_MIN_COUNT = 6
-search = False
-
-
 # If set, use binary search to find the vocabulary set with size closest to the target size
 def generate_record_from_file(train_example_path, eval_example_path, vocab_file, train_output_path,
-                              eval_output_path, max_seq_length):
+                              eval_output_path, max_seq_length, config):
     processor = DataProcessor()
     label_list = processor.get_labels()
     sub_tokenizer = tokenizer.Subtokenizer.init_from_files(
-        vocab_file, [train_example_path, eval_example_path], _TARGET_VOCAB_SIZE, _TARGET_THRESHOLD,
-        min_count=None if search else _TRAIN_DATA_MIN_COUNT)
+        vocab_file, [train_example_path, eval_example_path], config.vocab_size, config.generate_threshold,
+        min_count=None if config.generate_search else config.generate_DATA_MIN_COUNT)
     train_example = processor.get_train_examples(train_example_path)
     num_train_data = len(train_example)
     convert_examples_to_features(train_example, label_list, max_seq_length, sub_tokenizer, train_output_path)
@@ -170,4 +164,3 @@ def write_raw_data(train_example_path, eval_example_path):
     write(train_dataset, train_example_path)
     test_dataset = tfds.load(name="imdb_reviews", split=tfds.Split.TEST, as_supervised=True)
     write(test_dataset, eval_example_path)
-

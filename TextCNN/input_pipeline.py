@@ -27,7 +27,7 @@ def input_fn_builder(file_path, name_to_features):
     return input_fn
 
 
-def create_classifier_dataset(file_path, seq_length, batch_size, is_training=True, drop_remainder=True):
+def create_classifier_dataset(file_path, seq_length, batch_size, buffer_size, is_training=True, drop_remainder=True):
     name_to_features = {
         'input_ids': tf.io.FixedLenFeature([seq_length], tf.int64),
         'label_ids': tf.io.FixedLenFeature([], tf.int64),
@@ -42,7 +42,6 @@ def create_classifier_dataset(file_path, seq_length, batch_size, is_training=Tru
         y = record['label_ids']
         return x, y
 
-    buffer_size = 24999
     dataset = dataset.map(_select_data_from_record)
 
     if is_training:
@@ -51,4 +50,3 @@ def create_classifier_dataset(file_path, seq_length, batch_size, is_training=Tru
     dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
     # dataset = dataset.prefetch(1024)
     return dataset
-

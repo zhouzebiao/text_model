@@ -11,7 +11,7 @@ import json
 
 
 def get_model(config, float_type):
-    core_model = TextCNN(config, float_type)
+    core_model = TextRNN(config, float_type)
     return core_model
 
 
@@ -24,11 +24,11 @@ class Config(object):
         self.vocab_size = 32768
         self.max_seq_length = 256
         self.num_labels = 2
-        self.kernel_sizes = (3, 4, 5)
-        self.num_filter = 128
-        self.activation = 'relu'
+        self.activation = 'tanh'
         self.last_activation = 'sigmoid'
+        self.rnn_units = 'LSTM'
         self.hidden_size = 256
+        self.num_units = 64
         self.initializer_range = 0.2
         self.dropout_keep_prob = 0.35
 
@@ -57,13 +57,13 @@ class Config(object):
         return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
 
 
-class TextCNN(tf.keras.layers.Layer, ABC):
+class TextRNN(tf.keras.layers.Layer, ABC):
     def __init__(self, config, float_type=tf.float32, **kwargs):
-        super(TextCNN, self).__init__(**kwargs)
+        super(TextRNN, self).__init__(**kwargs)
         self.config = copy.deepcopy(config)
         self.float_type = float_type
         self.embedding_lookup = None
-        self.filter = None
+        self.bi_rnn = None
 
     def build(self, input_shape):
         self.embedding_lookup = EmbeddingLookup(
@@ -72,59 +72,57 @@ class TextCNN(tf.keras.layers.Layer, ABC):
             initializer_range=self.config.initializer_range,
             dtype=tf.float32,
             name="word_embeddings")
-        self.filter = Filter(kernel_sizes=self.config.kernel_sizes,
-                             num_filter=self.config.num_filter,
-                             activation=self.config.activation,
-                             num_labels=self.config.num_labels,
-                             last_activation=self.config.last_activation,
-                             dropout_keep_prob=self.config.dropout_keep_prob
-                             )
+        self.bi_rnn = BiRNN(rnn_units=self.config.rnn_units,
+                            num_units=self.config.num_units,
+                            activation=self.config.activation,
+                            num_labels=self.config.num_labels,
+                            last_activation=self.config.last_activation,
+                            dropout_keep_prob=self.config.dropout_keep_prob
+                            )
 
     def __call__(self, inputs, **kwargs):
-        return super(TextCNN, self).__call__(inputs, **kwargs)
+        return super(TextRNN, self).__call__(inputs, **kwargs)
 
     def call(self, inputs, **kwargs):
         x = self.embedding_lookup(inputs)
-        output = self.filter(x)
+        output = self.bi_rnn(x)
         return output
 
 
-class Filter(tf.keras.layers.Layer, ABC):
-    def __init__(self, kernel_sizes, num_filter, activation, num_labels, last_activation, dropout_keep_prob, **kwargs):
-        super(Filter, self).__init__(**kwargs)
-        self.kernel_sizes = kernel_sizes
-        self.num_filter = num_filter
+class BiRNN(tf.keras.layers.Layer, ABC):
+    def __init__(self, rnn_units, num_units, activation, num_labels, last_activation, dropout_keep_prob, **kwargs):
+        super(BiRNN, self).__init__(**kwargs)
+        self.rnn_units = rnn_units
+        self.num_units = num_units
         self.activation = activation
         self.num_labels = num_labels
         self.last_activation = last_activation
         self.dropout_keep_prob = dropout_keep_prob
-        self.convolution_pools = []
-        self.concatenate = None
-        self.output_dense = None
+        self.layer = None
         self.dropout = None
+        self.output_dense = None
 
     def build(self, input_shape):
-        for k in self.kernel_sizes:
-            convolution = tf.keras.layers.Conv1D(filters=self.num_filter, kernel_size=k, activation=self.activation)
-            pooled = tf.keras.layers.GlobalMaxPool1D()
-            self.convolution_pools.append((convolution, pooled))
-        self.concatenate = tf.keras.layers.Concatenate(axis=-1)
+        if self.rnn_units == 'LSTM':
+            layer_cell = tf.keras.layers.LSTM(self.num_units, activation=self.activation)
+        elif self.rnn_units == 'GRU':
+            layer_cell = tf.keras.layers.GRU(self.num_units, activation=self.activation)
+        else:
+            layer_cell = tf.keras.layers.RNN(self.num_units, activation=self.activation)
+        self.layer = tf.keras.layers.Bidirectional(layer_cell, merge_mode='concat')
         self.dropout = tf.keras.layers.Dropout(self.dropout_keep_prob)
         self.output_dense = tf.keras.layers.Dense(units=self.num_labels, activation=self.last_activation)
-        super(Filter, self).build(input_shape)
+        super(BiRNN, self).build(input_shape)
 
     def __call__(self, inputs, **kwargs):
-        return super(Filter, self).__call__(inputs, **kwargs)
+        return super(BiRNN, self).__call__(inputs, **kwargs)
 
     def call(self, inputs, **kwargs):
-        result = []
-        for convolution_pool in self.convolution_pools:
-            convolution, pool = convolution_pool
-            c = convolution(inputs)
-            p = pool(c)
-            result.append(p)
-        x = self.concatenate(result)
-        x = self.dropout(x)
+        x = self.layer(inputs)
+        print('#####get_shape_list(x)')
+        # x = self.dropout(x)
+        x = x[:, -1:]
+        print(get_shape_list(x))
         output = self.output_dense(x)
         return output
 

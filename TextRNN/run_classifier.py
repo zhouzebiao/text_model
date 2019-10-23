@@ -10,7 +10,7 @@ import data_lib
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.datasets import imdb
 from tensorflow.keras.preprocessing import sequence
-from text_cnn import get_model, Config
+from text_rnn import get_model, Config
 import input_pipeline
 import tensorflow as tf
 import model_training_utils

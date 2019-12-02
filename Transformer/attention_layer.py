@@ -9,7 +9,7 @@ import tensorflow as tf
 class Attention(tf.keras.layers.Layer):
     """Multi-headed attention layer."""
 
-    def __init__(self, hidden_size, num_heads, attention_dropout):
+    def __init__(self, embedding_size, hidden_size, num_heads, attention_dropout):
         if hidden_size % num_heads:
             raise ValueError(
                 "Hidden size ({}) must be divisible by the number of heads ({})."
@@ -19,6 +19,7 @@ class Attention(tf.keras.layers.Layer):
         self.hidden_size = hidden_size
         self.num_heads = num_heads
         self.attention_dropout = attention_dropout
+        self.embedding_size = embedding_size
         self.q_dense_layer = None
         self.k_dense_layer = None
         self.v_dense_layer = None
@@ -26,11 +27,11 @@ class Attention(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         self.q_dense_layer = tf.keras.layers.Dense(
-            self.hidden_size, use_bias=False, name="q")
+            self.embedding_size, use_bias=False, name="q")
         self.k_dense_layer = tf.keras.layers.Dense(
-            self.hidden_size, use_bias=False, name="k")
+            self.embedding_size, use_bias=False, name="k")
         self.v_dense_layer = tf.keras.layers.Dense(
-            self.hidden_size, use_bias=False, name="v")
+            self.embedding_size, use_bias=False, name="v")
         self.output_dense_layer = tf.keras.layers.Dense(
             self.hidden_size, use_bias=False, name="output_transform")
         super(Attention, self).build(input_shape)
@@ -47,7 +48,7 @@ class Attention(tf.keras.layers.Layer):
         length = tf.shape(x)[1]
         batch_size = tf.shape(x)[0]
         # Calculate depth of last dimension after it has been split.
-        depth = (self.hidden_size // self.num_heads)
+        depth = (self.embedding_size // self.num_heads)
 
         # Split the last dimension
         x = tf.reshape(x, [batch_size, length, self.num_heads, depth])
@@ -59,7 +60,7 @@ class Attention(tf.keras.layers.Layer):
         batch_size = tf.shape(x)[0]
         length = tf.shape(x)[2]
         x = tf.transpose(x, [0, 2, 1, 3])  # [batch, length, num_heads, depth]
-        return tf.reshape(x, [batch_size, length, self.hidden_size])
+        return tf.reshape(x, [batch_size, length, self.embedding_size])
 
     def call(self, inputs, **kwargs):
         x = inputs['query_input']  # [batch_size, length_x, hidden_size]
@@ -97,14 +98,31 @@ class Attention(tf.keras.layers.Layer):
         logits += bias
         # float16
         weights = tf.nn.softmax(logits, name="attention_weights")
-        if training:
+        if training is not None:
             weights = tf.nn.dropout(weights, rate=self.attention_dropout)
         attention_output = tf.matmul(weights, v)
 
         attention_output = self.combine_heads(attention_output)
 
         attention_output = self.output_dense_layer(attention_output)
-        return attention_output
+
+        def count():
+            total_parameters = 0
+            for variable in tf.trainable_variables():
+                # shape is an array of tf.Dimension
+                shape = variable.get_shape()
+                # print(shape)
+                # print(len(shape))
+                variable_parameters = 1
+                for dim in shape:
+                    # print(dim)
+                    variable_parameters *= dim.value
+                # print(variable_parameters)
+                total_parameters += variable_parameters
+            print(total_parameters)
+
+        count()
+        return attention_output, cache
 
 
 class SelfAttention(Attention):

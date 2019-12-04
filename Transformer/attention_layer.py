@@ -9,17 +9,16 @@ import tensorflow as tf
 class Attention(tf.keras.layers.Layer):
     """Multi-headed attention layer."""
 
-    def __init__(self, embedding_size, hidden_size, num_heads, attention_dropout):
+    def __init__(self, embedding_size, hidden_size, num_heads, attention_dropout, train):
         if hidden_size % num_heads:
-            raise ValueError(
-                "Hidden size ({}) must be divisible by the number of heads ({})."
-                    .format(hidden_size, num_heads))
+            raise ValueError((hidden_size, num_heads))
 
         super(Attention, self).__init__()
         self.hidden_size = hidden_size
         self.num_heads = num_heads
         self.attention_dropout = attention_dropout
         self.embedding_size = embedding_size
+        self.train = train
         self.q_dense_layer = None
         self.k_dense_layer = None
         self.v_dense_layer = None
@@ -66,7 +65,6 @@ class Attention(tf.keras.layers.Layer):
         x = inputs['query_input']  # [batch_size, length_x, hidden_size]
         y = inputs['source_input']  # [batch_size, length_x, hidden_size]
         bias = inputs['bias']  # 缩放点击计算需要，可广播
-        training = inputs['training']  # boolean
         cache = inputs['cache']
         # {"k": tensor with shape [batch_size, i, key_channels],
         # "v": tensor with shape [batch_size, i, value_channels]}
@@ -98,7 +96,7 @@ class Attention(tf.keras.layers.Layer):
         logits += bias
         # float16
         weights = tf.nn.softmax(logits, name="attention_weights")
-        if training is not None:
+        if self.train:
             weights = tf.nn.dropout(weights, rate=self.attention_dropout)
         attention_output = tf.matmul(weights, v)
 

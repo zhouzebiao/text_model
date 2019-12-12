@@ -7,7 +7,6 @@ import tensorflow as tf
 
 
 class Attention(tf.keras.layers.Layer):
-    """Multi-headed attention layer."""
 
     def __init__(self, embedding_size, hidden_size, num_heads, attention_dropout, train):
         if hidden_size % num_heads:
@@ -34,13 +33,6 @@ class Attention(tf.keras.layers.Layer):
         self.output_dense_layer = tf.keras.layers.Dense(
             self.hidden_size, use_bias=False, name="output_transform")
         super(Attention, self).build(input_shape)
-
-    # def get_config(self):
-    #     return {
-    #         "hidden_size": self.hidden_size,
-    #         "num_heads": self.num_heads,
-    #         "attention_dropout": self.attention_dropout,
-    #     }
 
     def split_heads(self, x):
 
@@ -89,7 +81,7 @@ class Attention(tf.keras.layers.Layer):
         v = self.split_heads(v)
 
         # 缩放
-        q /= (self.hidden_size // self.num_heads) ** -0.5
+        q /= (self.embedding_size // self.num_heads) ** -0.5
 
         # 点积
         logits = tf.matmul(q, k, transpose_b=True)
@@ -106,7 +98,7 @@ class Attention(tf.keras.layers.Layer):
 
         def count():
             total_parameters = 0
-            for variable in tf.trainable_variables():
+            for variable in tf.compat.v1.trainable_variables():
                 # shape is an array of tf.Dimension
                 shape = variable.get_shape()
                 # print(shape)
@@ -117,7 +109,7 @@ class Attention(tf.keras.layers.Layer):
                     variable_parameters *= dim.value
                 # print(variable_parameters)
                 total_parameters += variable_parameters
-            print(total_parameters)
+            # print(total_parameters)
 
         count()
         return attention_output, cache

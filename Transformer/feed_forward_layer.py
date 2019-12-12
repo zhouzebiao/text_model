@@ -5,7 +5,7 @@
 import tensorflow as tf
 
 
-class FeedForwardNetwork(tf.layers.Layer):
+class FeedForwardNetwork(tf.keras.layers.Layer):
     def __init__(self, hidden_size, filter_size, relu_dropout, train):
         super(FeedForwardNetwork, self).__init__()
         self.hidden_size = hidden_size
@@ -16,9 +16,10 @@ class FeedForwardNetwork(tf.layers.Layer):
         self.output_dense_layer = None
 
     def build(self, input_shape):
-        self.filter_dense_layer = tf.layers.Dense(self.filter_size, use_bias=True, activation=tf.nn.leaky_relu,
-                                                  name='filter_layer')
-        self.output_dense_layer = tf.layers.Dense(self.hidden_size, use_bias=True, name='output_layer')
+        self.filter_dense_layer = tf.compat.v1.layers.Dense(self.filter_size, use_bias=True,
+                                                            activation=tf.nn.leaky_relu,
+                                                            name='filter_layer')
+        self.output_dense_layer = tf.compat.v1.layers.Dense(self.hidden_size, use_bias=True, name='output_layer')
 
     def call(self, inputs, **kwargs):
         output = self.filter_dense_layer(inputs)

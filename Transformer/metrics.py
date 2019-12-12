@@ -12,7 +12,6 @@ def _pad(a, b):
     y_length = tf.shape(b)[1]
 
     max_length = tf.maximum(x_length, y_length)
-
     a = tf.pad(a, [[0, 0], [0, max_length - x_length], [0, 0]])
     b = tf.pad(b, [[0, 0], [0, max_length - y_length]])
     return a, b
@@ -27,10 +26,8 @@ def cross_entropy_loss(logits, targets, smoothing, vocab_size, data_type):
     loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=soft_targets, logits=logits)
     loss = tf.cast(loss, data_type)
     normalizing_constant = -(
-            confidence * tf.log(confidence) +
-            tf.cast(vocab_size - 1, data_type) * low_confidence * tf.log(low_confidence + 1e-20))
-    print(normalizing_constant)
-    print(loss)
+            confidence * tf.math.log(confidence) +
+            tf.cast(vocab_size - 1, data_type) * low_confidence * tf.math.log(low_confidence + 1e-20))
     loss -= normalizing_constant
     weights = tf.cast(tf.not_equal(targets, 0), data_type)
     return loss * weights, weights
@@ -91,5 +88,6 @@ def transformer_loss(logits, labels, smoothing, vocab_size, data_type):
       smoothing: Label smoothing constant, used to determine the on and off values
       vocab_size: int size of the vocabulary
     """
+    print('transformer_loss',logits, labels)
     entropy, weights = cross_entropy_loss(logits, labels, smoothing, vocab_size, data_type)
     return tf.reduce_sum(entropy) / tf.reduce_sum(weights)

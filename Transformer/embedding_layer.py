@@ -8,7 +8,7 @@ import tensorflow as tf
 class EmbeddingSharedWeights(tf.keras.layers.Layer):
 
     def __init__(self, vocab_size, embedding_size, data_type):
-        super(EmbeddingSharedWeights, self).__init__()
+        super(EmbeddingSharedWeights, self).__init__(dtype=data_type)
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
         self.shared_weights = None
@@ -17,7 +17,7 @@ class EmbeddingSharedWeights(tf.keras.layers.Layer):
     def build(self, input_shape):
         self.shared_weights = tf.compat.v1.get_variable(
             "weights", [self.vocab_size, self.embedding_size],
-            initializer=tf.random_normal_initializer(0., self.embedding_size ** -0.5))
+            initializer=tf.random_normal_initializer(0., self.embedding_size ** -0.5), dtype=self.data_type)
 
     def call(self, inputs, **kwargs):
         mask = tf.cast(tf.not_equal(inputs, 0), dtype=self.data_type)

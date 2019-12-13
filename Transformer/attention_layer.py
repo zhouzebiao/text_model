@@ -8,11 +8,12 @@ import tensorflow as tf
 
 class Attention(tf.keras.layers.Layer):
 
-    def __init__(self, embedding_size, hidden_size, num_heads, attention_dropout, train):
+    def __init__(self, hidden_size, num_heads, attention_dropout, embedding_size, train, data_type):
+
         if hidden_size % num_heads:
             raise ValueError((hidden_size, num_heads))
 
-        super(Attention, self).__init__()
+        super(Attention, self).__init__(dtype=data_type)
         self.hidden_size = hidden_size
         self.num_heads = num_heads
         self.attention_dropout = attention_dropout
@@ -25,13 +26,13 @@ class Attention(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         self.q_dense_layer = tf.keras.layers.Dense(
-            self.embedding_size, use_bias=False, name="q")
+            self.embedding_size, use_bias=False, name="q", dtype=self.dtype)
         self.k_dense_layer = tf.keras.layers.Dense(
-            self.embedding_size, use_bias=False, name="k")
+            self.embedding_size, use_bias=False, name="k", dtype=self.dtype)
         self.v_dense_layer = tf.keras.layers.Dense(
-            self.embedding_size, use_bias=False, name="v")
+            self.embedding_size, use_bias=False, name="v", dtype=self.dtype)
         self.output_dense_layer = tf.keras.layers.Dense(
-            self.hidden_size, use_bias=False, name="output_transform")
+            self.hidden_size, use_bias=False, name="output_transform", dtype=self.dtype)
         super(Attention, self).build(input_shape)
 
     def split_heads(self, x):
@@ -65,7 +66,6 @@ class Attention(tf.keras.layers.Layer):
         q = self.q_dense_layer(x)
         k = self.k_dense_layer(y)
         v = self.v_dense_layer(y)
-
         if cache is not None:
             # Combine cached keys and values with new keys and values.
             k = tf.concat([tf.cast(cache["k"], k.dtype), k], axis=1)
@@ -101,8 +101,6 @@ class Attention(tf.keras.layers.Layer):
             for variable in tf.compat.v1.trainable_variables():
                 # shape is an array of tf.Dimension
                 shape = variable.get_shape()
-                # print(shape)
-                # print(len(shape))
                 variable_parameters = 1
                 for dim in shape:
                     # print(dim)

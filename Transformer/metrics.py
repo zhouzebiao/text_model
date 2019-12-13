@@ -59,7 +59,7 @@ def neg_log_perplexity(logits, targets, vocab_size, data_type):
 
 class MetricLayer(tf.keras.layers.Layer):
     def __init__(self, vocab_size, data_type):
-        super(MetricLayer, self).__init__()
+        super(MetricLayer, self).__init__(dtype=data_type)
         self.vocab_size = vocab_size
         self.data_type = data_type
         self.metric = None
@@ -88,6 +88,5 @@ def transformer_loss(logits, labels, smoothing, vocab_size, data_type):
       smoothing: Label smoothing constant, used to determine the on and off values
       vocab_size: int size of the vocabulary
     """
-    print('transformer_loss',logits, labels)
     entropy, weights = cross_entropy_loss(logits, labels, smoothing, vocab_size, data_type)
     return tf.reduce_sum(entropy) / tf.reduce_sum(weights)

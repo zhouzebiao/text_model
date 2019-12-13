@@ -8,23 +8,23 @@ import tensorflow as tf
 from tensorflow.python.util import nest
 
 
-def inf(dtype):
+def inf(data_type):
     """Returns a value close to infinity, but is still finite in `dtype`.
     This is useful to get a very large value that is still zero when multiplied by
     zero. The floating-point "Inf" value is NaN when multiplied by zero.
     Args:
-      dtype: A dtype. The returned value will be finite when casted to this dtype.
+      data_type: A dtype. The returned value will be finite when casted to this dtype.
     Returns:
       A very large value.
     """
-    if dtype == "float32":
+    if data_type == "float32":
         return 1e7
-    elif dtype == "float16":
+    elif data_type == "float16":
         # Disable no-member lint error, as the linter thinks np.float16 does not
         # exist for some reason.
         return np.finfo(np.float16).max  # pylint: disable=no-member
     else:
-        raise AssertionError('Invalid dtype: %s' % dtype)
+        raise AssertionError('Invalid dtype: %s' % data_type)
 
 
 class _StateKeys(object):
@@ -196,7 +196,7 @@ class SequenceBeamSearchV2():
 
         # Calculate largest length penalty (the larger penalty, the better score).
         max_length_norm = _length_normalization(self.alpha, self.max_decode_length,
-                                                dtype=self.data_type)
+                                                data_type=self.data_type)
         # Get the best possible scores from alive sequences.
         best_alive_scores = alive_log_probs[:, 0] / max_length_norm
 
@@ -363,7 +363,7 @@ class SequenceBeamSearchV2():
              tf.zeros([self.batch_size, self.beam_size, 1], tf.int32)], axis=2)
 
         # Calculate new seq scores from log probabilities.
-        length_norm = _length_normalization(self.alpha, i + 1, dtype=self.data_type)
+        length_norm = _length_normalization(self.alpha, i + 1, data_type=self.data_type)
         new_scores = new_log_probs / length_norm
 
         # Set the scores of the still-alive seq in new_seq to large negative values.
@@ -390,7 +390,7 @@ class SequenceBeamSearchV2():
 
 def sequence_beam_search(
         symbols_to_logits_fn, initial_ids, initial_cache, vocab_size, beam_size,
-        alpha, max_decode_length, eos_id, dtype="float32"):
+        alpha, max_decode_length, eos_id, data_type):
     """Search for sequence of subtoken ids with the largest probability.
     Args:
       symbols_to_logits_fn: A function that takes in ids, index, and cache as
@@ -418,7 +418,7 @@ def sequence_beam_search(
     # if misc.is_v2():
     sbs = SequenceBeamSearchV2(symbols_to_logits_fn, vocab_size, batch_size,
                                beam_size, alpha, max_decode_length, eos_id,
-                               dtype)
+                               data_type)
     # else:
     #   sbs = v1.SequenceBeamSearch(symbols_to_logits_fn, vocab_size, batch_size,
     #                               beam_size, alpha, max_decode_length, eos_id,
@@ -452,9 +452,9 @@ def _log_prob_from_logits(logits):
     return logits - tf.reduce_logsumexp(logits, axis=2, keepdims=True)
 
 
-def _length_normalization(alpha, length, dtype=tf.float32):
+def _length_normalization(alpha, length, data_type):
     """Return length normalization factor."""
-    return tf.pow(((5. + tf.cast(length, dtype)) / 6.), alpha)
+    return tf.pow(((5. + tf.cast(length, data_type)) / 6.), alpha)
 
 
 def _expand_to_beam_size(tensor, beam_size):

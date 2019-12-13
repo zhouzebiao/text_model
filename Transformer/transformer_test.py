@@ -17,7 +17,7 @@ class TransformerV2Test(tf.test.TestCase):
         params["vocab_size"] = 41
         params["extra_decode_length"] = 2
         params["beam_size"] = 3
-        params["data_type"] = tf.float32
+        params["data_type"] = tf.float16
         params["train"] = True
         params["layer_postprocess_dropout"] = 0.1
 
@@ -31,7 +31,7 @@ class TransformerV2Test(tf.test.TestCase):
         self.assertEqual(inputs[1].shape.as_list(), [None, None])
         self.assertEqual(inputs[1].dtype, tf.int64)
         self.assertEqual(outputs[0].shape.as_list(), [None, None, 41])
-        self.assertEqual(outputs[0].dtype, tf.float32)
+        self.assertEqual(outputs[0].dtype, self.params["data_type"])
 
     def test1_create_model_not_train(self):
         self.params["train"] = False
@@ -44,7 +44,7 @@ class TransformerV2Test(tf.test.TestCase):
         self.assertEqual(outputs[0].shape.as_list(), [None, None])
         self.assertEqual(outputs[0].dtype, tf.int32)
         self.assertEqual(outputs[1].shape.as_list(), [None])
-        self.assertEqual(outputs[1].dtype, tf.float32)
+        self.assertEqual(outputs[1].dtype, self.params["data_type"])
 
 
 if __name__ == "__main__":

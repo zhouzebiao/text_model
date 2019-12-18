@@ -57,7 +57,7 @@ class _StateKeys(object):
     FINISHED_FLAGS = "FINISHED_FLAGS"
 
 
-class SequenceBeamSearchV2():
+class SequenceBeamSearch:
     """Implementation of beam search loop in v2."""
 
     def __init__(self, symbols_to_logits_fn, vocab_size, batch_size,
@@ -409,20 +409,16 @@ def sequence_beam_search(
       alpha: float defining the strength of length normalization
       max_decode_length: maximum length to decoded sequence
       eos_id: int id of eos token, used to determine when a sequence has finished,
-      dtype: The dtype to use.
+      data_type: The dtype to use.
     Returns:
       Top decoded sequences [batch_size, beam_size, max_decode_length]
       sequence scores [batch_size, beam_size]
     """
     batch_size = tf.shape(initial_ids)[0]
-    # if misc.is_v2():
-    sbs = SequenceBeamSearchV2(symbols_to_logits_fn, vocab_size, batch_size,
-                               beam_size, alpha, max_decode_length, eos_id,
-                               data_type)
-    # else:
-    #   sbs = v1.SequenceBeamSearch(symbols_to_logits_fn, vocab_size, batch_size,
-    #                               beam_size, alpha, max_decode_length, eos_id,
-    #                               dtype)
+    sbs = SequenceBeamSearch(symbols_to_logits_fn, vocab_size, batch_size,
+                             beam_size, alpha, max_decode_length, eos_id,
+                             data_type)
+
     return sbs.search(initial_ids, initial_cache)
 
 

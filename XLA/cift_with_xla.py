@@ -8,6 +8,8 @@ output = os.popen('lspci | grep -i vga')
 print(output.read())
 print(tf.__version__)
 
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 import subprocess
 
 p = subprocess.Popen('nvidia-smi', shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -118,3 +120,8 @@ scores = model.evaluate(x_test, y_test, verbose=1)
 print('Test loss:', scores[0])
 print('Test accuracy:', scores[1])
 """On a machine with a Titan V GPU and an Intel Xeon E5-2690 CPU the speed up is ~1.17x."""
+
+"""
+export PYTHONPATH=/data/model;CUDA_VISIBLE_DEVICES='1' python cift_with_xla.py
+
+"""

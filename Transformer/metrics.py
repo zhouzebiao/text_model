@@ -23,7 +23,7 @@ def cross_entropy_loss(logits, targets, smoothing, vocab_size, data_type):
     low_confidence = (1.0 / confidence) / tf.cast(vocab_size - 1, data_type)
     soft_targets = tf.one_hot(tf.cast(targets, tf.int32), depth=vocab_size,
                               on_value=confidence, off_value=low_confidence)
-    loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=soft_targets, logits=logits)
+    loss = tf.nn.softmax_cross_entropy_with_logits(labels=soft_targets, logits=logits)
     loss = tf.cast(loss, data_type)
     normalizing_constant = -(
             confidence * tf.math.log(confidence) +

@@ -101,3 +101,11 @@ def eval_input_fn(params):
     return _read_and_batch_from_files(
         file_pattern, params["batch_size"], params["max_length"],
         params["num_parallel_calls"], shuffle=False, repeat=1)
+
+
+def map_data_for_transformer_fn(x, y):
+    """Maps data for training, and handles weried behaviors for different vers."""
+    # Will transform input x and targets y into tuple(x, y) as new model inputs.
+
+    # For TF v1, Keras requires a dummy placeholder as the 2nd parameter.
+    return (x, y), tf.constant(0.0)

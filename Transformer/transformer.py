@@ -20,6 +20,7 @@ def create_model(params):
             vocab_size = params["vocab_size"]
             label_smoothing = params["label_smoothing"]
             if params["enable_metrics_in_training"]:
+                # logits = metrics.MetricLayer(vocab_size, params['data_type'])([logits, targets])
                 logits = metrics.MetricLayer(vocab_size, params['data_type'])([logits, targets])
             logits = tf.keras.layers.Lambda(lambda x: x, name="logits", dtype=params['data_type'])(logits)
             model = tf.keras.Model([inputs, targets], logits)
@@ -46,6 +47,8 @@ class Transformer(tf.keras.Model):
         self.decoder_stack = DecoderStack(params)
         self._NEG_INF_FP32 = -1e9
         self._NEG_INF_FP16 = np.finfo(np.float16).min
+        print(self.params)
+
 
     def get_padding_bias(self, x):
         with tf.name_scope("attention_bias"):

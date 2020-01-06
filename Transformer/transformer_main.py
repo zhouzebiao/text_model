@@ -8,13 +8,12 @@ import tempfile
 from absl import app as absl_app  # pylint: disable=unused-import
 from absl import flags
 
-import dataset
 import tensorflow as tf
 import tokenizer
 import transformer
 import translate
-# pylint: disable=g-bad-import-order
 from official.transformer import compute_bleu
+from official.transformer.v2 import data_pipeline as dataset
 from official.transformer.v2 import misc
 from official.transformer.v2 import optimizer
 from official.utils.flags import core as flags_core
@@ -144,6 +143,7 @@ class TransformerTask(object):
 
         cased_score, uncased_score = None, None
         cased_score_history, uncased_score_history = [], []
+        history = None
         for i in range(1, iterations + 1):
             print("Start train iteration:{}/{}".format(i, iterations))
             history = model.fit(
@@ -159,10 +159,11 @@ class TransformerTask(object):
                 i,
                 iterations,
                 i * flags_obj.steps_between_evals))
+            # dict(history.history)
             tf.compat.v1.logging.info("Train history: {}".format(history.history))
             misc.build_stats(history, callbacks)
 
-            if (flags_obj.bleu_source and flags_obj.bleu_ref):
+            if flags_obj.bleu_source and flags_obj.bleu_ref:
                 uncased_score, cased_score = self.eval()
                 cased_score_history.append([i, cased_score])
                 uncased_score_history.append([i, uncased_score])
@@ -222,7 +223,8 @@ class TransformerTask(object):
                                                             save_weights_only=True))
         return callbacks
 
-    def _load_weights_if_possible(self, model, init_weight_path=None):
+    @staticmethod
+    def _load_weights_if_possible(model, init_weight_path=None):
         """Loads model weights when it is provided."""
         if init_weight_path:
             tf.compat.v1.logging.info("Load weights: {}".format(init_weight_path))

@@ -1,18 +1,7 @@
-# Copyright 2018 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""Download and preprocess WMT17 ende training and evaluation datasets."""
+# -*- coding: utf-8 -*-
+"""
+ Created by zaber on 2019-12-04 17:
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -157,19 +146,6 @@ def write_file(writer, filename):
 ###############################################################################
 def encode_and_save_files(
         subtokenizer, data_dir, raw_files, tag, total_shards):
-    """Save data from files as encoded Examples in TFrecord format.
-
-    Args:
-      subtokenizer: Subtokenizer object that will be used to encode the strings.
-      data_dir: The directory in which to write the examples
-      raw_files: A tuple of (input, target) data files. Each line in the input and
-        the corresponding line in target file will be saved in a tf.Example.
-      tag: String that will be added onto the file names.
-      total_shards: Number of files to divide the data into.
-
-    Returns:
-      List of all files produced.
-    """
     # Create a file for each shard.
     filepaths = [shard_filename(data_dir, tag, n + 1, total_shards)
                  for n in range(total_shards)]

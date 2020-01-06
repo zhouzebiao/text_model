@@ -51,5 +51,5 @@ if __name__ == "__main__":
     tf.compat.v1.enable_v2_behavior()
     tf.test.main()
 """
-export PYTHONPATH=/data/model;CUDA_VISIBLE_DEVICES='7' python transformer_test.py
+export PYTHONPATH=/opt/model;CUDA_VISIBLE_DEVICES='1' python transformer_test.py
 """

@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+"""
+ Created by zaber on 2019-12-04 17:
+"""
 import numpy as np
 
 import attention_layer
@@ -136,6 +140,7 @@ class Transformer(tf.keras.Model):
             # Generate output sequence if targets is None, or return logits if target
             # sequence is known.
             if targets is None:
+                print('if targets is None:',encoder_outputs,attention_bias)
                 logits = self.predict(
                     {'encoder_outputs': encoder_outputs, 'encoder_decoder_attention_bias': attention_bias})
                 return logits

@@ -2,11 +2,6 @@
 """
  Created by zaber on 2019-12-20 00:
 """
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow as tf
 import tokenizer
 
@@ -17,13 +12,7 @@ _ALPHA = 0.6
 
 
 def _get_sorted_inputs(filename):
-    """Read and sort lines from the file sorted by decreasing length.
-    Args:
-      filename: String name of file to read inputs from.
-    Returns:
-      Sorted list of inputs, and dictionary mapping original index->sorted index
-      of each element.
-    """
+
     with tf.io.gfile.GFile(filename) as f:
         records = f.read().split("\n")
         inputs = [record.strip() for record in records]
@@ -58,17 +47,6 @@ def _trim_and_decode(ids, subtokenizer):
 def translate_file(
         model, subtokenizer, input_file, output_file=None,
         print_all_translations=True):
-    """Translate lines in file, and save to output file if specified.
-    Args:
-      model: Keras model used to generate the translations.
-      subtokenizer: Subtokenizer object for encoding and decoding source and
-         translated lines.
-      input_file: file containing lines to translate
-      output_file: file that stores the generated translations.
-      print_all_translations: If true, all translations are printed to stdout.
-    Raises:
-      ValueError: if output file is invalid.
-    """
     batch_size = _DECODE_BATCH_SIZE
 
     # Read and sort inputs by length. Keep dictionary (original index-->new index
@@ -88,7 +66,7 @@ def translate_file(
             lines = [_encode_and_add_eos(l, subtokenizer) for l in lines]
             batch = tf.keras.preprocessing.sequence.pad_sequences(
                 lines, dtype="int64", padding="post")
-            tf.logging.info("Decoding batch %d out of %d.", i,
+            tf.compat.v1.logging.info("Decoding batch %d out of %d.", i,
                                       num_decode_batches)
             yield batch
 
@@ -101,7 +79,7 @@ def translate_file(
             translation = _trim_and_decode(val_outputs[j], subtokenizer)
             translations.append(translation)
             if print_all_translations:
-                tf.logging.info(
+                tf.compat.v1.logging.info(
                     "Translating:\n\tInput: %s\n\tOutput: %s" %
                     (sorted_inputs[j + i * batch_size], translation))
 
@@ -110,7 +88,7 @@ def translate_file(
         if tf.io.gfile.isdir(output_file):
             raise ValueError("File output is a directory, will not save outputs to "
                              "file.")
-        tf.logging.info("Writing to file %s" % output_file)
+        tf.compat.v1.logging.info("Writing to file %s" % output_file)
         with tf.compat.v1.gfile.Open(output_file, "w") as f:
             for i in sorted_keys:
                 f.write("%s\n" % translations[i])
@@ -120,10 +98,10 @@ def translate_from_text(model, subtokenizer, txt):
     encoded_txt = _encode_and_add_eos(txt, subtokenizer)
     result = model.predict(encoded_txt)
     outputs = result["outputs"]
-    tf.logging.info("Original: \"%s\"" % txt)
+    tf.compat.v1.logging.info("Original: \"%s\"" % txt)
     translate_from_input(outputs, subtokenizer)
 
 
 def translate_from_input(outputs, subtokenizer):
     translation = _trim_and_decode(outputs, subtokenizer)
-    tf.logging.info("Translation: \"%s\"" % translation)
+    tf.compat.v1.logging.info("Translation: \"%s\"" % translation)

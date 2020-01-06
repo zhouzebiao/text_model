@@ -20,7 +20,7 @@ def _pad(a, b):
 def cross_entropy_loss(logits, targets, smoothing, vocab_size, data_type):
     logits, targets = _pad(logits, targets)
     confidence = tf.cast(1.0 - smoothing, data_type)
-    low_confidence = (1.0 / confidence) / tf.cast(vocab_size - 1, data_type)
+    low_confidence = (1.0 - confidence) / tf.cast(vocab_size - 1, data_type)
     soft_targets = tf.one_hot(tf.cast(targets, tf.int32), depth=vocab_size,
                               on_value=confidence, off_value=low_confidence)
     loss = tf.nn.softmax_cross_entropy_with_logits(labels=soft_targets, logits=logits)
@@ -82,11 +82,5 @@ class MetricLayer(tf.keras.layers.Layer):
 
 
 def transformer_loss(logits, labels, smoothing, vocab_size, data_type):
-    """Calculates total loss containing cross entropy with padding ignored.
-      logits: Tensor of size [batch_size, length_logits, vocab_size]
-      labels: Tensor of size [batch_size, length_labels]
-      smoothing: Label smoothing constant, used to determine the on and off values
-      vocab_size: int size of the vocabulary
-    """
     entropy, weights = cross_entropy_loss(logits, labels, smoothing, vocab_size, data_type)
     return tf.reduce_sum(entropy) / tf.reduce_sum(weights)

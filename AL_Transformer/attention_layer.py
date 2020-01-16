@@ -139,8 +139,6 @@ class Dense3D(tf.keras.layers.Layer):
         return ret
 
 
-
-
 class Attention(tf.keras.layers.Layer):
     """Multi-headed attention layer."""
 
@@ -187,8 +185,7 @@ class Attention(tf.keras.layers.Layer):
             "attention_dropout": self.attention_dropout,
         }
 
-    def call(self, query_input, source_input, bias, training, cache=None,
-             decode_loop_step=None):
+    def call(self, query_input, source_input, bias, training, cache=None):
         """Apply attention mechanism to query_input and source_input.
 
         Args:
@@ -219,20 +216,8 @@ class Attention(tf.keras.layers.Layer):
 
         if cache is not None:
             # Combine cached keys and values with new keys and values.
-            if decode_loop_step is not None:
-                cache_k_shape = cache["k"].shape.as_list()
-                indices = tf.reshape(
-                    tf.one_hot(decode_loop_step, cache_k_shape[1], dtype=key.dtype),
-                    [1, cache_k_shape[1], 1, 1])
-                key = cache["k"] + key * indices
-                cache_v_shape = cache["v"].shape.as_list()
-                indices = tf.reshape(
-                    tf.one_hot(decode_loop_step, cache_v_shape[1], dtype=value.dtype),
-                    [1, cache_v_shape[1], 1, 1])
-                value = cache["v"] + value * indices
-            else:
-                key = tf.concat([tf.cast(cache["k"], key.dtype), key], axis=1)
-                value = tf.concat([tf.cast(cache["v"], value.dtype), value], axis=1)
+            key = tf.concat([tf.cast(cache["k"], key.dtype), key], axis=1)
+            value = tf.concat([tf.cast(cache["v"], value.dtype), value], axis=1)
 
             # Update cache
             cache["k"] = key
@@ -266,4 +251,4 @@ class SelfAttention(Attention):
     def call(self, query_input, bias, training, cache=None,
              decode_loop_step=None):
         return super(SelfAttention, self).call(
-            query_input, query_input, bias, training, cache, decode_loop_step)
+            query_input, query_input, bias, training, cache)

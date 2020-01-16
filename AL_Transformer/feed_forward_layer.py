@@ -1,16 +1,28 @@
 # -*- coding: utf-8 -*-
 """
- Created by zaber on 2019-12-03 14:
+ Created by zaber on 2020-01-03 14:
 """
+import numpy as np
+
 import tensorflow as tf
 
 
+def gelu(x):
+    """Gaussian Error Linear Unit.
+    Original paper: https://arxiv.org/abs/1606.08415
+    """
+    cdf = 0.5 * (1.0 + tf.tanh(
+        (np.sqrt(2 / np.pi) * (x + 0.044715 * tf.pow(x, 3)))))
+    return x * cdf
+
+
 class FeedForwardNetwork(tf.keras.layers.Layer):
-    def __init__(self, hidden_size, filter_size, relu_dropout, train, data_type):
-        super(FeedForwardNetwork, self).__init__(dtype=data_type)
+    def __init__(self, hidden_size, filter_size, gelu_dropout, train):
+        super(FeedForwardNetwork, self).__init__()
         self.hidden_size = hidden_size
         self.filter_size = filter_size
-        self.relu_dropout = relu_dropout
+        # self.intermediate_size = intermediate_size
+        self.gelu_dropout =gelu_dropout
         self.train = train
         self.filter_dense_layer = None
         self.output_dense_layer = None
@@ -25,7 +37,7 @@ class FeedForwardNetwork(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         output = self.filter_dense_layer(inputs)
         if self.train:
-            output = tf.nn.dropout(output, rate=self.relu_dropout)
+            output = tf.nn.dropout(output, rate=self.gelu_dropout)
         output = self.output_dense_layer(output)
 
         return output

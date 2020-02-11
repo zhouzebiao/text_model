@@ -51,9 +51,9 @@ _TRAIN_DATA_MIN_COUNT = 6
 
 _EVAL_DATA_SOURCES = [
     {
-        "input": "en",
-        "target": "zh",
-        "label": "label",
+        "input": "en.eval",
+        "target": "zh.eval",
+        "label": "label.eval",
     }
 ]
 
@@ -218,7 +218,7 @@ def encode_and_save_files(
         example = dict_to_example(
             {"inputs": subtokenizer.encode(input_line, add_eos=True),
              "targets": subtokenizer.encode(target_line, add_eos=True),
-             "labels": [int(label_line)]
+             "labels": subtokenizer.encode(label_line, add_eos=False)
              })
         writers[shard].write(example.SerializeToString())
         shard = (shard + 1) % total_shards
@@ -303,7 +303,7 @@ def main(unused_argv):
 
     # Create subtokenizer based on the training files.
     tf.logging.info("Step 3/5: Creating subtokenizer and building vocabulary")
-    train_files_flat = train_files["inputs"] + train_files["targets"]
+    train_files_flat = [train_files["inputs"] + train_files["targets"]]
     vocab_file = os.path.join(FLAGS.data_dir, VOCAB_FILE)
 
     subtokenizer = tokenizer.Subtokenizer.init_from_files(

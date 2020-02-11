@@ -13,16 +13,15 @@ from absl import app
 from absl import flags
 from absl import logging
 
+import data_pipeline
 import tensorflow as tf
 import transformer
+import translate
 # pylint: disable=g-bad-import-order
 from official.transformer import compute_bleu
 from official.transformer.utils import tokenizer
-import data_pipeline
-from official.transformer.v2 import metrics
 from official.transformer.v2 import misc
 from official.transformer.v2 import optimizer
-import translate
 from official.utils.flags import core as flags_core
 from official.utils.logs import logger
 from official.utils.misc import distribution_utils
@@ -220,7 +219,7 @@ class TransformerTask(object):
                     .experimental_distribute_datasets_from_function(
                     lambda ctx: data_pipeline.train_input_fn(params, ctx)))
         else:
-            train_ds = data_pipeline.train_inpute_fn(params)
+            train_ds = data_pipeline.train_input_fn(params)
             map_data_fn = data_pipeline.map_data_for_transformer_fn
             train_ds = train_ds.map(
                 map_data_fn, num_parallel_calls=params["num_parallel_calls"])
@@ -230,8 +229,7 @@ class TransformerTask(object):
         callbacks = self._create_callbacks(flags_obj.model_dir, 0, params)
 
         # TODO(b/139418525): Refactor the custom training loop logic.
-        train_loss=0
-
+        train_loss = 0
 
         # cased_score, uncased_score = None, None
         # cased_score_history, uncased_score_history = [], []

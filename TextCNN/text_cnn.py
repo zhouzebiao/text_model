@@ -2,12 +2,13 @@
 """
  Created by zaber on 2019-09-14 12:
 """
+import copy
+import json
 from abc import ABC
 
-import tensorflow as tf
-import copy
 import six
-import json
+
+import tensorflow as tf
 
 
 def get_model(config, float_type):

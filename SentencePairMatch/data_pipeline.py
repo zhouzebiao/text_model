@@ -58,7 +58,7 @@ from absl import logging
 
 import tensorflow as tf
 from official.transformer.v2 import misc
-from official.utils.misc import model_helpers
+import model_helpers
 
 # Buffer size for reading records from a TFRecord file. Each training file is
 # 7.2 MB, so 8 MB allows an entire file to be kept in memory.
@@ -270,25 +270,26 @@ def _read_and_batch_from_files(
     return dataset
 
 
-def _generate_synthetic_data(params):
-    """Create synthetic data based on the parameter batch size."""
-    batch = length = int(math.sqrt(params["batch_size"]))
-    dataset = model_helpers.generate_synthetic_data(
-        input_shape=tf.TensorShape([length]),
-        input_value=1,
-        input_dtype=tf.int64,
-        label_shape=tf.TensorShape([length]),
-        label_value=1,
-        label_dtype=tf.int64,
-    )
-    return dataset.batch(batch, drop_remainder=True)
+# def _generate_synthetic_data(params):
+#     """Create synthetic data based on the parameter batch size."""
+#     batch = length = int(math.sqrt(params["batch_size"]))
+#     dataset = model_helpers.generate_synthetic_data(
+#         source_shape=tf.TensorShape([length]),
+#         source_value=1,
+#         source_dtype=tf.int64,
+#         target_shape=tf.TensorShape([length]),
+#         target_value=1,
+#         target_dtype=tf.int64,
+#         label_shape=tf.TensorShape([length]),
+#         label_value=1,
+#         label_dtype=tf.int64,
+#     )
+#     return dataset.batch(batch, drop_remainder=True)
 
 
 def train_input_fn(params, ctx=None):
     """Load and return dataset of batched examples for use during training."""
     file_pattern = os.path.join(params["data_dir"] or "", "*train*")
-    if params["use_synthetic_data"]:
-        return _generate_synthetic_data(params)
     return _read_and_batch_from_files(
         file_pattern, params["batch_size"], params["max_length"],
         params["num_parallel_calls"], shuffle=True,
@@ -301,8 +302,8 @@ def eval_input_fn(params, ctx=None):
     file_pattern = os.path.join(params["data_dir"] or "", "*dev*")
     print(params["use_synthetic_data"], file_pattern, params["batch_size"], params["max_length"],
           params["num_parallel_calls"], params["static_batch"], params["num_gpus"], ctx)
-    if params["use_synthetic_data"]:
-        return _generate_synthetic_data(params)
+    # if params["use_synthetic_data"]:
+    #     return _generate_synthetic_data(params)
     return _read_and_batch_from_files(
         file_pattern, params["batch_size"], params["max_length"],
         params["num_parallel_calls"], shuffle=False, repeat=1,

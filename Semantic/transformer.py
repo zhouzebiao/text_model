@@ -5,59 +5,45 @@
 import attention_layer
 import embedding_layer
 import feed_forward_layer
-import metrics
 import tensorflow as tf
 from official.transformer.model import model_utils
 
 
-# def get_loss_fn(batch_size, labels, logits):
-#     loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-#         reduction=tf.keras.losses.Reduction.NONE)
-#
-#     def loss_fn(labels, logits):
-#         print(labels.shape, logits.shape, 'def loss_fn(labels, logits):')
-#         with tf.name_scope("Transformer_loss_fn"):
-#             per_example_loss = loss_object(labels, logits)
-#             return tf.nn.compute_average_loss(per_example_loss, global_batch_size=batch_size)
-#
-#     loss = loss_fn(labels, logits)
-#     return loss
+class Config(object):
+    def __init__(self):
+        self.meta_data = {}
+        self.generate_threshold = 327
+        self.generate_DATA_MIN_COUNT = 6
+        self.generate_search = False
+        self.vocab_size = 32768
+        self.max_seq_length = 256
+        self.num_labels = 2
+        self.activation = 'relu'
+        self.last_activation = 'sigmoid'
+        self.hidden_size = 512
+        self.initializer_range = 0.2
+        self.dropout_keep_prob = 0.35
 
 
-def create_model(params, is_train):
+def get_loss_fn(batch_size, labels, logits):
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
+        reduction=tf.keras.losses.Reduction.NONE)
+
+    def loss_fn(labels, logits):
+        print(labels.shape, logits.shape, 'def loss_fn(labels, logits):')
+        with tf.name_scope("Transformer"):
+            per_example_loss = loss_object(labels, logits)
+            return tf.nn.compute_average_loss(per_example_loss, global_batch_size=batch_size)
+
+    loss = loss_fn(labels, logits)
+    return loss
+
+
+def create_model(params):
     """Creates transformer model."""
     with tf.name_scope("model"):
-        #         example = dict_to_example(
-        #             {"inputs": subtokenizer.encode(input_line, add_eos=True),
-        #              "targets": subtokenizer.encode(target_line, add_eos=True),
-        #              "labels": [int(label_line)]
-        #              })
-        if is_train:
-            num_label = 2
-            inputs = tf.keras.layers.Input((None,), dtype="int64", name="inputs")
-            targets = tf.keras.layers.Input((None,), dtype="int64", name="targets")
-            labels = tf.keras.layers.Input((None,), dtype="int64", name="labels")
-            internal_model = Transformer(params, name="transformer_v2")
-            logits = internal_model([inputs, targets, labels], training=is_train)
-            label_smoothing = params["label_smoothing"]
-            if params["enable_metrics_in_training"]:
-                logits = metrics.MetricLayer(num_label)([logits, labels])
-            logits = tf.keras.layers.Lambda(lambda x: x, name="logits",
-                                            dtype=tf.float32)(logits)
-            model = tf.keras.Model([inputs, targets, labels], logits)
-            # TODO(reedwm): Can we do this loss in float16 instead of float32?
-            loss = metrics.transformer_loss(
-                logits, labels, label_smoothing, num_label)
-            model.add_loss(loss)
-            return model
-
-        else:
-            inputs = tf.keras.layers.Input((None,), dtype="int64", name="inputs")
-            targets = tf.keras.layers.Input((None,), dtype="int64", name="targets")
-            internal_model = Transformer(params, name="transformer_v2")
-            ret = internal_model([inputs, targets], training=is_train)
-            outputs, scores = ret["outputs"], ret["scores"]
-            return tf.keras.Model([inputs, targets], [outputs, scores])
+        core_model = Transformer(params)
+        return core_model
 
 
 class Transformer(tf.keras.Model):
@@ -94,10 +80,7 @@ class Transformer(tf.keras.Model):
         }
 
     def call(self, inputs, **kwargs):
-        if len(inputs) == 3:
-            inputs, targets, labels = inputs[0], inputs[1], None
-        else:
-            inputs, targets, labels = inputs[0], inputs[1], None
+        inputs, targets = inputs[0], inputs[1]
         # Variance scaling is used here because it seems to work in many problems.
         # Other reasonable initializers may also work just as well.
         with tf.name_scope("Transformer"):
@@ -117,6 +100,7 @@ class Transformer(tf.keras.Model):
             print(logits1.shape, logits2.shape, 'logits1.shape,logits2.shape')
             x = self.concatenate([logits1, logits2])
             logits = self.output_dense(x)
+            print(logits.shape, 'logits.shape')
             return logits
 
     def encode(self, inputs, attention_bias, training):
@@ -153,7 +137,7 @@ class Transformer(tf.keras.Model):
                 encoder_inputs, attention_bias, inputs_padding)
             # logits = self.embedding_layer(outputs, mode="linear")
             logits = tf.reduce_sum(outputs, axis=1)
-            # logits = tf.reshape(logits, [self.params["batch_size"], self.params["hidden_size"]])
+            logits = tf.reshape(logits, [self.params["batch_size"], self.params["hidden_size"]])
             logits = tf.cast(logits, tf.float32)
             return logits
 
@@ -196,7 +180,7 @@ class Transformer(tf.keras.Model):
                 encoder_inputs, attention_bias, inputs_padding)
             # logits = self.embedding_layer(outputs, mode="linear")
             logits = tf.reduce_sum(outputs, axis=1)
-            # logits = tf.reshape(logits, [self.params["batch_size"], self.params["hidden_size"]])
+            logits = tf.reshape(logits, [self.params["batch_size"], self.params["hidden_size"]])
             logits = tf.cast(logits, tf.float32)
             return logits
 

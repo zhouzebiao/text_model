@@ -10,18 +10,19 @@ import tensorflow as tf
 from official.transformer.model import model_utils
 
 
-# def get_loss_fn(batch_size, labels, logits):
-#     loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-#         reduction=tf.keras.losses.Reduction.NONE)
-#
-#     def loss_fn(labels, logits):
-#         print(labels.shape, logits.shape, 'def loss_fn(labels, logits):')
-#         with tf.name_scope("Transformer_loss_fn"):
-#             per_example_loss = loss_object(labels, logits)
-#             return tf.nn.compute_average_loss(per_example_loss, global_batch_size=batch_size)
-#
-#     loss = loss_fn(labels, logits)
-#     return loss
+def get_loss_fn(batch_size, labels, logits):
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
+        reduction=tf.keras.losses.Reduction.NONE)
+
+    def loss_fn(labels, logits):
+        print(labels.shape, logits.shape, 'def loss_fn(labels, logits):')
+        with tf.name_scope("Transformer_loss_fn"):
+            per_example_loss = loss_object(labels, logits)
+            bs = labels.shape[0]
+            return tf.nn.compute_average_loss(per_example_loss, global_batch_size=batch_size)
+
+    loss = loss_fn(labels, logits)
+    return loss
 
 
 def create_model(params, is_train):
@@ -46,8 +47,9 @@ def create_model(params, is_train):
                                             dtype=tf.float32)(logits)
             model = tf.keras.Model([inputs, targets, labels], logits)
             # TODO(reedwm): Can we do this loss in float16 instead of float32?
-            loss = metrics.transformer_loss(
-                logits, labels, label_smoothing, num_label)
+            # loss = metrics.transformer_loss(
+            #     logits, labels, label_smoothing, num_label)
+            loss = get_loss_fn(params['batch_size'], labels, logits)
             model.add_loss(loss)
             return model
 
@@ -114,9 +116,14 @@ class Transformer(tf.keras.Model):
             logits2 = self.decode(targets, attention_bias2, self.params['train'])
             # logits = tf.matmul(logits1, logits2, transpose_b=True)
             # logits = tf.einsum("BTNH,BFNH->BNFT", logits1, logits2)
-            print(logits1.shape, logits2.shape, 'logits1.shape,logits2.shape')
+            # print(logits1.shape, logits2.shape, 'logits1.shape,logits2.shape')
             x = self.concatenate([logits1, logits2])
+            # x = tf.matmul(logits1, logits2, transpose_b=True)
+            # x = tf.reduce_sum(x, axis=-1)
             logits = self.output_dense(x)
+            # _matrixA_norm = tf.math.sqrt(tf.matmul(logits1, logits2).sum(axis=1))
+            # _matrixB_norm = numpy.sqrt(numpy.multiply(_matrixB, _matrixB).sum(axis=1))
+            # return numpy.divide(_matrixA_matrixB, _matrixA_norm * _matrixB_norm.transpose())
             return logits
 
     def encode(self, inputs, attention_bias, training):

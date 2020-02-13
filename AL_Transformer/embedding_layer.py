@@ -71,7 +71,7 @@ class EmbeddingSharedWeights(tf.keras.layers.Layer):
     def _embedding(self, inputs):
         """Applies embedding based on inputs tensor."""
         with tf.name_scope("embedding"):
-            print('EmbeddingSharedWeights', self.shared_weights)
+            # print('EmbeddingSharedWeights', self.shared_weights)
             embeddings = tf.gather(self.shared_weights, tf.cast(inputs, dtype=tf.int32))
             batch_size = tf.shape(inputs)[0]
             length = tf.shape(inputs)[1]

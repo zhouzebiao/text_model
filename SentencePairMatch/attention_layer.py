@@ -7,24 +7,6 @@ import tensorflow as tf
 
 
 class Dense3D(tf.keras.layers.Layer):
-    """A Dense Layer using 3D kernel with tf.einsum implementation.
-
-    Attributes:
-      num_attention_heads: An integer, number of attention heads for each
-        multihead attention layer.
-      size_per_head: An integer, hidden size per attention head.
-      hidden_size: An integer, dimension of the hidden layer.
-      kernel_initializer: An initializer for the kernel weight.
-      bias_initializer: An initializer for the bias.
-      activation: An activation function to use. If nothing is specified, no
-        activation is applied.
-      use_bias: A bool, whether the layer uses a bias.
-      output_projection: A bool, whether the Dense3D layer is used for output
-        linear projection.
-      backward_compatible: A bool, whether the variables shape are compatible
-        with checkpoints converted from TF 1.x.
-    """
-
     def __init__(self,
                  num_attention_heads=12,
                  size_per_head=72,

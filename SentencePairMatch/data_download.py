@@ -218,7 +218,7 @@ def encode_and_save_files(
         example = dict_to_example(
             {"inputs": subtokenizer.encode(input_line, add_eos=True),
              "targets": subtokenizer.encode(target_line, add_eos=True),
-             "labels": subtokenizer.encode(label_line, add_eos=False)
+             "labels": [int(label_line.strip())]
              })
         writers[shard].write(example.SerializeToString())
         shard = (shard + 1) % total_shards

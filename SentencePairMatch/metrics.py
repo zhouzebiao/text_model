@@ -1,27 +1,4 @@
-# Copyright 2018 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the 'License');
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an 'AS IS' BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""Functions for calculating loss, accuracy, and other model metrics.
 
-Metrics:
- - Padded loss, accuracy, and negative log perplexity. Source:
-     https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/utils/metrics.py
- - BLEU approximation. Source:
-     https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/utils/bleu_hook.py
- - ROUGE score. Source:
-     https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/utils/rouge.py
-"""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -45,18 +22,7 @@ def _pad_tensors_to_same_length(x, y):
 
 
 def padded_cross_entropy_loss(logits, labels, smoothing, num_labels):
-    """Calculate cross entropy loss while ignoring padding.
 
-    Args:
-      logits: Tensor of size [batch_size, length_logits, vocab_size]
-      labels: Tensor of size [batch_size, length_labels]
-      smoothing: Label smoothing constant, used to determine the on and off values
-      num_labels: int size of the vocabulary
-
-    Returns:
-      Returns the cross entropy loss and weight tensors: float32 tensors with
-        shape [batch_size, max(length_logits, length_labels)]
-    """
     with tf.name_scope("loss"):
         print('logits, labels', logits.shape, labels.shape)
         # logits, labels = _pad_tensors_to_same_length(logits, labels)
@@ -167,18 +133,18 @@ class MetricLayer(tf.keras.layers.Layer):
         return logits
 
 
-def transformer_loss(logits, labels, smoothing, vocab_size):
+def transformer_loss(logits, labels, smoothing, num_labels):
     """Calculates total loss containing cross entropy with padding ignored.
 
     Args:
       logits: Tensor of size [batch_size, length_logits, vocab_size]
       labels: Tensor of size [batch_size, length_labels]
       smoothing: Label smoothing constant, used to determine the on and off values
-      vocab_size: int size of the vocabulary
+      num_labels: int size of the vocabulary
 
     Returns:
       A scalar float tensor for loss.
     """
     xentropy, weights = padded_cross_entropy_loss(logits, labels, smoothing,
-                                                  vocab_size)
+                                                  num_labels)
     return tf.reduce_sum(xentropy) / tf.reduce_sum(weights)

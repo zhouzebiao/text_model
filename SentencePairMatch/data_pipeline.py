@@ -1,52 +1,3 @@
-# Copyright 2018 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""Input pipeline for the transformer model to read, filter, and batch examples.
-
-Two things to note in the pipeline:
-
-1. Batching scheme
-
-   The examples encoded in the TFRecord files contain data in the format:
-     {"inputs": [variable length array of integers],
-      "targets": [variable length array of integers]}
-   Where integers in the arrays refer to tokens in the English and German vocab
-   file (named `vocab.ende.32768`).
-
-   Prior to batching, elements in the dataset are grouped by length (max between
-   "inputs" and "targets" length). Each group is then batched such that:
-     group_batch_size * length <= batch_size.
-
-   Another way to view batch_size is the maximum number of tokens in each batch.
-
-   Once batched, each element in the dataset will have the shape:
-     {"inputs": [group_batch_size, padded_input_length],
-      "targets": [group_batch_size, padded_target_length]}
-   Lengths are padded to the longest "inputs" or "targets" sequence in the batch
-   (padded_input_length and padded_target_length can be different).
-
-   This batching scheme decreases the fraction of padding tokens per training
-   batch, thus improving the training speed significantly.
-
-2. Shuffling
-
-   While training, the dataset is shuffled in two places in the code. The first
-   is the list of training files. Second, while reading records using
-   `parallel_interleave`, the `sloppy` argument is used to generate randomness
-   in the order of the examples.
-"""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -58,7 +9,7 @@ from absl import logging
 
 import tensorflow as tf
 from official.transformer.v2 import misc
-import model_helpers
+# import model_helpers
 
 # Buffer size for reading records from a TFRecord file. Each training file is
 # 7.2 MB, so 8 MB allows an entire file to be kept in memory.
@@ -134,23 +85,6 @@ def _create_min_max_boundaries(
 
 
 def _batch_examples(dataset, batch_size, max_length):
-    """Group examples by similar lengths, and return batched dataset.
-
-    Each batch of similar-length examples are padded to the same length, and may
-    have different number of elements in each batch, such that:
-      group_batch_size * padded_length <= batch_size.
-
-    This decreases the number of padding tokens per batch, which improves the
-    training speed.
-
-    Args:
-      dataset: Dataset of unbatched examples.
-      batch_size: Max number of tokens per batch of examples.
-      max_length: Max number of tokens in an example input or target sequence.
-
-    Returns:
-      Dataset of batched examples with similar lengths.
-    """
     # Get min and max boundary lists for each example. These are used to calculate
     # the `bucket_id`, which is the index at which:
     # buckets_min[bucket_id] <= len(example) < buckets_max[bucket_id]
@@ -197,36 +131,6 @@ def _batch_examples(dataset, batch_size, max_length):
 def _read_and_batch_from_files(
         file_pattern, batch_size, max_length, num_parallel_calls, shuffle, repeat,
         static_batch=False, num_replicas=1, ctx=None):
-    """Create dataset where each item is a dict of "inputs" and "targets".
-
-    Args:
-      file_pattern: String used to match the input TFRecord files.
-      batch_size: Maximum number of tokens per global batch of examples.
-      max_length: Maximum number of tokens per example
-      num_parallel_calls: Number of cpu cores for parallel input processing.
-      shuffle: If true, randomizes order of elements.
-      repeat: Number of times to repeat the dataset. If None, the dataset is
-        repeated forever.
-      static_batch: Whether the batches in the dataset should have static shapes.
-        If True, the input is batched so that every batch has the
-        shape [batch_size // max_length, max_length]. If False, the input is
-        grouped by length, and batched so that batches may have different
-        shapes [N, M], where:
-          N * M <= batch_size
-          M <= max_length
-        In general, this setting should be False. Dynamic shapes allow the inputs
-        to be grouped so that the number of padding tokens is minimized, and helps
-        model training. In cases where the input shape must be static
-        (e.g. running on TPU), this setting should be set to True.
-      num_replicas: Number of GPUs or other workers. We will generate global
-        batches, and each global batch is equally divisible by number of replicas.
-        Currently it is only effective when static_batch==True. TODO: make it
-        effective when static_batch=False.
-      ctx: Input context.
-
-    Returns:
-      tf.data.Dataset object containing examples loaded from the files.
-    """
     dataset = tf.data.Dataset.list_files(file_pattern, shuffle=shuffle)
 
     if ctx and ctx.num_input_pipelines > 1:

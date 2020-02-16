@@ -1,4 +1,3 @@
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -22,10 +21,9 @@ def _pad_tensors_to_same_length(x, y):
 
 
 def padded_cross_entropy_loss(logits, labels, smoothing, num_labels):
-
     with tf.name_scope("loss"):
-        print('logits, labels', logits.shape, labels.shape)
-        # logits, labels = _pad_tensors_to_same_length(logits, labels)
+        # print('logits, labels', logits.shape, labels.shape)
+        logits, labels = _pad_tensors_to_same_length(logits, labels)
 
         # Calculate smoothing cross entropy
         with tf.name_scope("smoothing_cross_entropy"):
@@ -148,3 +146,4 @@ def transformer_loss(logits, labels, smoothing, num_labels):
     xentropy, weights = padded_cross_entropy_loss(logits, labels, smoothing,
                                                   num_labels)
     return tf.reduce_sum(xentropy) / tf.reduce_sum(weights)
+    # return tf.reduce_sum(xentropy)

@@ -41,9 +41,9 @@ from official.utils.flags import core as flags_core
 # that generates a vocabulary set that is closest in size to _TARGET_VOCAB_SIZE.
 _TRAIN_DATA_SOURCES = [
     {
-        "input": "en",
-        "target": "zh",
-        "label": "label",
+        "input": "en.train",
+        "target": "zh.train",
+        "label": "label.train",
     },
 ]
 # Use pre-defined minimum count to generate subtoken vocabulary.

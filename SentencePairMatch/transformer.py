@@ -5,51 +5,50 @@
 import attention_layer
 import embedding_layer
 import feed_forward_layer
-import metrics
 import tensorflow as tf
 from official.transformer.model import model_utils
+from official.transformer.v2 import metrics
 
 
-def get_loss_fn(batch_size, labels, logits):
-    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-        reduction=tf.keras.losses.Reduction.NONE)
+def get_loss_fn(num_classes, loss_factor=1.0):
+    """Gets the classification loss function."""
 
-    def loss_fn(labels, logits):
-        print(labels.shape, logits.shape, 'def loss_fn(labels, logits):')
-        with tf.name_scope("Transformer_loss_fn"):
-            per_example_loss = loss_object(labels, logits)
-            bs = labels.shape[0]
-            return tf.nn.compute_average_loss(per_example_loss, global_batch_size=batch_size)
+    def classification_loss_fn(labels, logits):
+        """Classification loss."""
+        labels = tf.squeeze(labels)
+        log_probs = tf.nn.log_softmax(logits, axis=-1)
+        one_hot_labels = tf.one_hot(
+            tf.cast(labels, dtype=tf.int32), depth=num_classes, dtype=tf.float32)
+        per_example_loss = -tf.reduce_sum(
+            tf.cast(one_hot_labels, dtype=tf.float32) * log_probs, axis=-1)
+        loss = tf.reduce_mean(per_example_loss)
+        loss *= loss_factor
+        return loss
 
-    loss = loss_fn(labels, logits)
-    return loss
+    return classification_loss_fn
 
 
 def create_model(params, is_train):
     """Creates transformer model."""
     with tf.name_scope("model"):
-        #         example = dict_to_example(
-        #             {"inputs": subtokenizer.encode(input_line, add_eos=True),
-        #              "targets": subtokenizer.encode(target_line, add_eos=True),
-        #              "labels": [int(label_line)]
-        #              })
         if is_train:
-            num_label = 2
             inputs = tf.keras.layers.Input((None,), dtype="int64", name="inputs")
             targets = tf.keras.layers.Input((None,), dtype="int64", name="targets")
             labels = tf.keras.layers.Input((None,), dtype="int64", name="labels")
             internal_model = Transformer(params, name="transformer_v2")
             logits = internal_model([inputs, targets, labels], training=is_train)
+            # vocab_size = params["vocab_size"]
+            num_labels = 2
             label_smoothing = params["label_smoothing"]
             if params["enable_metrics_in_training"]:
-                logits = metrics.MetricLayer(num_label)([logits, labels])
+                logits = metrics.MetricLayer(num_labels)([logits, labels])
             logits = tf.keras.layers.Lambda(lambda x: x, name="logits",
                                             dtype=tf.float32)(logits)
             model = tf.keras.Model([inputs, targets, labels], logits)
             # TODO(reedwm): Can we do this loss in float16 instead of float32?
             # loss = metrics.transformer_loss(
-            #     logits, labels, label_smoothing, num_label)
-            loss = get_loss_fn(params['batch_size'], labels, logits)
+            #     logits, labels, label_smoothing, num_labels)
+            loss = get_loss_fn(2, loss_factor=1.0)(labels, logits)
             model.add_loss(loss)
             return model
 
@@ -59,7 +58,7 @@ def create_model(params, is_train):
             internal_model = Transformer(params, name="transformer_v2")
             ret = internal_model([inputs, targets], training=is_train)
             outputs, scores = ret["outputs"], ret["scores"]
-            return tf.keras.Model([inputs, targets], [outputs, scores])
+            return tf.keras.Model(inputs, [outputs, scores])
 
 
 class Transformer(tf.keras.Model):
@@ -84,11 +83,8 @@ class Transformer(tf.keras.Model):
         self.params = params
         self.embedding_layer = embedding_layer.EmbeddingSharedWeights(
             params["vocab_size"], params["embedding_size"], params["hidden_size"], 0.02)
-        self.encoder_stack1 = EncoderStack(params)
-        self.encoder_stack2 = EncoderStack(params)
-        self.concatenate = tf.keras.layers.Concatenate(axis=-1)
-        self.output_dense = tf.keras.layers.Dense(units=2, activation=tf.nn.tanh)
-        # self.decoder_stack = DecoderStack(params)
+        self.encoder_stack = EncoderStack(params)
+        self.decoder_stack = DecoderStack(params)
 
     def get_config(self):
         return {
@@ -96,34 +92,42 @@ class Transformer(tf.keras.Model):
         }
 
     def call(self, inputs, **kwargs):
-        if len(inputs) == 3:
-            inputs, targets, labels = inputs[0], inputs[1], None
-        else:
-            inputs, targets, labels = inputs[0], inputs[1], None
+        """Calculate target logits or inferred target sequences.
+
+        Args:
+          inputs: input tensor list of size 1 or 2.
+            First item, inputs: int tensor with shape [batch_size, input_length].
+            Second item (optional), targets: None or int tensor with shape
+              [batch_size, target_length].
+          training: boolean, whether in training mode or not.
+
+        Returns:
+          If targets is defined, then return logits for each word in the target
+          sequence. float tensor with shape [batch_size, target_length, vocab_size]
+          If target is none, then generate output sequence one token at a time.
+            returns a dictionary {
+              outputs: [batch_size, decoded length]
+              scores: [batch_size, float]}
+          Even when float16 is used, the output tensor(s) are always float32.
+
+        Raises:
+          NotImplementedError: If try to use padded decode method on CPU/GPUs.
+        """
+        source, targets = inputs[0], inputs[1]
+
         # Variance scaling is used here because it seems to work in many problems.
         # Other reasonable initializers may also work just as well.
         with tf.name_scope("Transformer"):
             # Calculate attention bias for encoder self-attention and decoder
             # multi-headed attention layers.
-            attention_bias1 = model_utils.get_padding_bias(inputs)
-            attention_bias2 = model_utils.get_padding_bias(targets)
+            attention_bias = model_utils.get_padding_bias(source)
 
             # Run the inputs through the encoder layer to map the symbol
             # representations to continuous representations.
-            logits1 = self.encode(inputs, attention_bias1, self.params['train'])
+            encoder_outputs = self.encode(source, attention_bias, self.params['train'])
             # Generate output sequence if targets is None, or return logits if target
             # sequence is known.
-            logits2 = self.decode(targets, attention_bias2, self.params['train'])
-            # logits = tf.matmul(logits1, logits2, transpose_b=True)
-            # logits = tf.einsum("BTNH,BFNH->BNFT", logits1, logits2)
-            # print(logits1.shape, logits2.shape, 'logits1.shape,logits2.shape')
-            x = self.concatenate([logits1, logits2])
-            # x = tf.matmul(logits1, logits2, transpose_b=True)
-            # x = tf.reduce_sum(x, axis=-1)
-            logits = self.output_dense(x)
-            # _matrixA_norm = tf.math.sqrt(tf.matmul(logits1, logits2).sum(axis=1))
-            # _matrixB_norm = numpy.sqrt(numpy.multiply(_matrixB, _matrixB).sum(axis=1))
-            # return numpy.divide(_matrixA_matrixB, _matrixA_norm * _matrixB_norm.transpose())
+            logits = self.decode(targets, encoder_outputs, attention_bias, self.params['train'])
             return logits
 
     def encode(self, inputs, attention_bias, training):
@@ -137,7 +141,7 @@ class Transformer(tf.keras.Model):
         Returns:
           float tensor with shape [batch_size, input_length, hidden_size]
         """
-        with tf.name_scope("encode"):
+        with tf.name_scope("encoder"):
             # Prepare inputs to the layer stack by adding positional encodings and
             # applying dropout.
             embedded_inputs = self.embedding_layer(inputs)
@@ -156,15 +160,10 @@ class Transformer(tf.keras.Model):
                 encoder_inputs = tf.nn.dropout(
                     encoder_inputs, rate=self.params["layer_postprocess_dropout"])
 
-            outputs = self.encoder_stack1(
+            return self.encoder_stack(
                 encoder_inputs, attention_bias, inputs_padding)
-            # logits = self.embedding_layer(outputs, mode="linear")
-            logits = tf.reduce_sum(outputs, axis=1)
-            # logits = tf.reshape(logits, [self.params["batch_size"], self.params["hidden_size"]])
-            logits = tf.cast(logits, tf.float32)
-            return logits
 
-    def decode(self, targets, attention_bias, training):
+    def decode(self, targets, encoder_outputs, attention_bias, training):
         """Generate logits for each value in the target sequence.
 
         Args:
@@ -181,94 +180,43 @@ class Transformer(tf.keras.Model):
         with tf.name_scope("decode"):
             # Prepare inputs to decoder layers by shifting targets, adding positional
             # encoding and applying dropout.
-            # Prepare inputs to the layer stack by adding positional encodings and
-            # applying dropout.
-            embedded_inputs = self.embedding_layer(targets)
-            embedded_inputs = tf.cast(embedded_inputs, self.params["dtype"])
-            inputs_padding = model_utils.get_padding(targets)
+            decoder_inputs = self.embedding_layer(targets)
+            decoder_inputs = tf.cast(decoder_inputs, self.params["dtype"])
             attention_bias = tf.cast(attention_bias, self.params["dtype"])
-
+            with tf.name_scope("shift_targets"):
+                # Shift targets to the right, and remove the last element
+                decoder_inputs = tf.pad(decoder_inputs,
+                                        [[0, 0], [1, 0], [0, 0]])[:, :-1, :]
             with tf.name_scope("add_pos_encoding"):
-                length = tf.shape(embedded_inputs)[1]
+                length = tf.shape(decoder_inputs)[1]
                 pos_encoding = model_utils.get_position_encoding(
                     length, self.params["hidden_size"])
                 pos_encoding = tf.cast(pos_encoding, self.params["dtype"])
-                encoder_inputs = embedded_inputs + pos_encoding
-
+                decoder_inputs += pos_encoding
             if training:
-                encoder_inputs = tf.nn.dropout(
-                    encoder_inputs, rate=self.params["layer_postprocess_dropout"])
+                decoder_inputs = tf.nn.dropout(
+                    decoder_inputs, rate=self.params["layer_postprocess_dropout"])
 
-            outputs = self.encoder_stack1(
-                encoder_inputs, attention_bias, inputs_padding)
-            # logits = self.embedding_layer(outputs, mode="linear")
-            logits = tf.reduce_sum(outputs, axis=1)
-            # logits = tf.reshape(logits, [self.params["batch_size"], self.params["hidden_size"]])
+            # Run values
+            # decoder_self_attention_bias = model_utils.get_decoder_self_attention_bias(
+            #     length, dtype=self.params["dtype"])
+            decoder_self_attention_bias = tf.ones([1, 1, length, length], dtype=self.params["dtype"])
+            logits = self.decoder_stack(
+                decoder_inputs,
+                encoder_outputs,
+                decoder_self_attention_bias,
+                attention_bias,
+                training=training)
+            # batch_size = tf.shape(logits)[0]
+            logits = tf.reduce_mean(logits, axis=1)
+            logits = self.embedding_layer(logits, mode="linear")
+
+            # logits = tf.reshape(logits, [batch_size, 2])
             logits = tf.cast(logits, tf.float32)
             return logits
 
-    def _get_symbols_to_logits_fn(self, max_decode_length, training):
-        """Returns a decoding function that calculates logits of the next tokens."""
-
-        timing_signal = model_utils.get_position_encoding(
-            max_decode_length + 1, self.params["hidden_size"])
-        timing_signal = tf.cast(timing_signal, self.params["dtype"])
-        decoder_self_attention_bias = model_utils.get_decoder_self_attention_bias(
-            max_decode_length, dtype=self.params["dtype"])
-
-        # TODO(b/139770046): Refactor code with better naming of i.
-        def symbols_to_logits_fn(ids, i, cache):
-            """Generate logits for next potential IDs.
-
-            Args:
-              ids: Current decoded sequences. int tensor with shape [batch_size *
-                beam_size, i + 1].
-              i: Loop index.
-              cache: dictionary of values storing the encoder output, encoder-decoder
-                attention bias, and previous decoder attention values.
-
-            Returns:
-              Tuple of
-                (logits with shape [batch_size * beam_size, vocab_size],
-                 updated cache values)
-            """
-            # Set decoder input to the last generated IDs
-            decoder_input = ids[:, -1:]
-
-            # Preprocess decoder input by getting embeddings and adding timing signal.
-            decoder_input = self.embedding_layer(decoder_input)
-
-            if self.params["padded_decode"]:
-                timing_signal_shape = timing_signal.shape.as_list()
-                decoder_input += tf.slice(timing_signal, [i, 0],
-                                          [1, timing_signal_shape[1]])
-
-                bias_shape = decoder_self_attention_bias.shape.as_list()
-                self_attention_bias = tf.slice(
-                    decoder_self_attention_bias, [0, 0, i, 0],
-                    [bias_shape[0], bias_shape[1], 1, bias_shape[3]])
-            else:
-                decoder_input += timing_signal[i:i + 1]
-
-                self_attention_bias = decoder_self_attention_bias[:, :, i:i + 1, :i + 1]
-
-            decoder_outputs = self.decoder_stack(
-                decoder_input,
-                cache.get("encoder_outputs"),
-                self_attention_bias,
-                cache.get("encoder_decoder_attention_bias"),
-                training=training,
-                cache=cache)
-            logits = self.embedding_layer(decoder_outputs, mode="linear")
-            logits = tf.squeeze(logits, axis=[1])
-            return logits, cache
-
-        return symbols_to_logits_fn
-
 
 class LayerNormalization(tf.keras.layers.Layer):
-    """Applies layer normalization."""
-
     def __init__(self, hidden_size):
         # Pass dtype=float32, as we have not yet tested if layer norm is numerically
         # stable in float16 and bfloat16.
@@ -473,14 +421,13 @@ class DecoderStack(tf.keras.layers.Layer):
         for n in range(self.params["num_hidden_layers"]):
             # Run inputs through the sublayers.
             layer_name = "layer_%d" % n
-            layer_cache = cache[layer_name] if cache is not None else None
+            # layer_cache = cache[layer_name] if cache is not None else None
             with tf.compat.v1.variable_scope("decode_layer", reuse=tf.compat.v1.AUTO_REUSE):
                 with tf.compat.v1.variable_scope("self_attention", reuse=tf.compat.v1.AUTO_REUSE):
                     decoder_inputs = self.self_attention_layer(
                         decoder_inputs,
                         decoder_self_attention_bias,
-                        training=training,
-                        cache=layer_cache)
+                        training=training)
                 with tf.compat.v1.variable_scope("encdec_attention", reuse=tf.compat.v1.AUTO_REUSE):
                     decoder_inputs = self.enc_dec_attention_layer(
                         decoder_inputs,

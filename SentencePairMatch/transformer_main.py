@@ -201,11 +201,7 @@ class TransformerTask(object):
                 current_step = opt.iterations.numpy()
                 logging.info(current_step)
 
-            if params["use_ctl"]:
-                train_loss_metric = tf.keras.metrics.Mean(
-                    "training_loss", dtype=tf.float32)
-            else:
-                model.compile(opt)
+            model.compile(opt)
 
         model.summary()
 

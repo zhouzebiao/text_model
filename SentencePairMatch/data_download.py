@@ -51,9 +51,9 @@ _TRAIN_DATA_MIN_COUNT = 6
 
 _EVAL_DATA_SOURCES = [
     {
-        "input": "en.eval",
-        "target": "zh.eval",
-        "label": "label.eval",
+        "input": "en.eval1",
+        "target": "zh.eval1",
+        "label": "label.eval1",
     }
 ]
 

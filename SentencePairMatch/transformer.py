@@ -57,8 +57,8 @@ def create_model(params, is_train):
             targets = tf.keras.layers.Input((None,), dtype="int64", name="targets")
             internal_model = Transformer(params, name="transformer_v2")
             ret = internal_model([inputs, targets], training=is_train)
-            outputs, scores = ret["outputs"], ret["scores"]
-            return tf.keras.Model(inputs, [outputs, scores])
+            outputs = ret
+            return tf.keras.Model([inputs, targets], outputs)
 
 
 class Transformer(tf.keras.Model):
@@ -127,6 +127,14 @@ class Transformer(tf.keras.Model):
             encoder_outputs = self.encode(source, attention_bias, self.params['train'])
             # Generate output sequence if targets is None, or return logits if target
             # sequence is known.
+            logits = self.decode(targets, encoder_outputs, attention_bias, self.params['train'])
+            return logits
+
+    def predict(self, inputs, **kwargs):
+        source, targets = inputs[0], inputs[1]
+        with tf.name_scope("Transformer_Predict"):
+            attention_bias = model_utils.get_padding_bias(source)
+            encoder_outputs = self.encode(source, attention_bias, self.params['train'])
             logits = self.decode(targets, encoder_outputs, attention_bias, self.params['train'])
             return logits
 
@@ -207,8 +215,12 @@ class Transformer(tf.keras.Model):
                 decoder_self_attention_bias,
                 attention_bias,
                 training=training)
-            # batch_size = tf.shape(logits)[0]
-            logits = tf.reduce_mean(logits, axis=1)
+            batch_size = tf.shape(logits)[0]
+            length = tf.shape(logits)[1]
+            hidden_size = tf.shape(logits)[2]
+            # logits = tf.reduce_mean(logits, axis=1)
+            logits = tf.reshape(logits, [batch_size, length * hidden_size])
+            logits = tf.reshape(logits, [batch_size, self.params['max_length'] * hidden_size])
             logits = self.embedding_layer(logits, mode="linear")
 
             # logits = tf.reshape(logits, [batch_size, 2])

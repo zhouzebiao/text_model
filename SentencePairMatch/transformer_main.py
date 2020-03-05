@@ -14,11 +14,10 @@ from absl import flags
 from absl import logging
 
 import data_pipeline
+import predict
 import tensorflow as tf
 import transformer
-import translate
 # pylint: disable=g-bad-import-order
-from official.transformer import compute_bleu
 from official.transformer.utils import tokenizer
 from official.transformer.v2 import misc
 from official.transformer.v2 import optimizer
@@ -35,74 +34,43 @@ _SINGLE_SAMPLE = 1
 def compute(model,
             params,
             subtokenizer,
-            bleu_source,
-            bleu_ref,
+            source_file,
+            target_file,
             distribution_strategy=None):
-    """Translate file and report the cased and uncased bleu scores.
-
-    Args:
-      model: A Keras model, used to generate the translations.
-      params: A dictionary, containing the translation related parameters.
-      subtokenizer: A subtokenizer object, used for encoding and decoding source
-        and translated lines.
-      bleu_source: A file containing source sentences for translation.
-      bleu_ref: A file containing the reference for the translated sentences.
-      distribution_strategy: A platform distribution strategy, used for TPU based
-        translation.
-
-    Returns:
-      uncased_score: A float, the case insensitive BLEU score.
-      cased_score: A float, the case sensitive BLEU score.
-    """
     # Create temporary file to store translation.
     tmp = tempfile.NamedTemporaryFile(delete=False)
     tmp_filename = tmp.name
 
-    translate.translate_file(
+    predict.eval_file(
         model,
         params,
         subtokenizer,
-        bleu_source,
+        source_file,
+        target_file,
         output_file=tmp_filename,
         print_all_translations=False,
         distribution_strategy=distribution_strategy)
 
     # Compute uncased and cased bleu scores.
-    uncased_score = compute_bleu.bleu_wrapper(bleu_ref, tmp_filename, False)
-    cased_score = compute_bleu.bleu_wrapper(bleu_ref, tmp_filename, True)
-    # os.remove(tmp_filename)
-    return uncased_score, cased_score
+    # uncased_score = compute_bleu.bleu_wrapper(bleu_ref, tmp_filename, False)
+    # cased_score = compute_bleu.bleu_wrapper(bleu_ref, tmp_filename, True)
+    # # os.remove(tmp_filename)
+    # return uncased_score, cased_score
 
 
 def evaluate(model,
              params,
-             bleu_source,
-             bleu_ref,
+             source_file,
+             target_file,
              vocab_file,
              distribution_strategy=None):
-    """Calculate and record the BLEU score.
-
-    Args:
-      model: A Keras model, used to generate the translations.
-      params: A dictionary, containing the translation related parameters.
-      bleu_source: A file containing source sentences for translation.
-      bleu_ref: A file containing the reference for the translated sentences.
-      vocab_file: A file containing the vocabulary for translation.
-      distribution_strategy: A platform distribution strategy, used for TPU based
-        translation.
-
-    Returns:
-      uncased_score: A float, the case insensitive BLEU score.
-      cased_score: A float, the case sensitive BLEU score.
-    """
     subtokenizer = tokenizer.Subtokenizer(vocab_file)
 
-    uncased_score, cased_score = compute(
-        model, params, subtokenizer, bleu_source, bleu_ref, distribution_strategy)
+    compute(model, params, subtokenizer, source_file, target_file, distribution_strategy)
 
-    logging.info("Bleu score (uncased): %s", uncased_score)
-    logging.info("Bleu score (cased): %s", cased_score)
-    return uncased_score, cased_score
+    # logging.info("Bleu score (uncased): %s", uncased_score)
+    # logging.info("Bleu score (cased): %s", cased_score)
+    # return uncased_score, cased_score
 
 
 class TransformerTask(object):
@@ -132,7 +100,7 @@ class TransformerTask(object):
         params["static_batch"] = flags_obj.static_batch
         params["max_length"] = flags_obj.max_length
         params["decode_batch_size"] = flags_obj.decode_batch_size
-        params["decode_max_length"] = flags_obj.decode_max_length
+        # params["decode_max_length"] = flags_obj.decode_max_length
         params["padded_decode"] = flags_obj.padded_decode
         params["num_parallel_calls"] = (
                 flags_obj.num_parallel_calls or tf.data.experimental.AUTOTUNE)
@@ -327,7 +295,7 @@ class TransformerTask(object):
         val_outputs, _ = ret
         length = len(val_outputs)
         for i in range(length):
-            translate.translate_from_input(val_outputs[i], subtokenizer)
+            predict.translate_from_input(val_outputs[i], subtokenizer)
         print('\n\n\n', time.time() - start)
 
     def _create_callbacks(self, cur_log_dir, init_steps, params):

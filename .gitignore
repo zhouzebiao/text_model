@@ -126,6 +126,7 @@ dmypy.json
 .pyre/
 
 official/
+research/
 tensor2tensor/
 .idea/
 

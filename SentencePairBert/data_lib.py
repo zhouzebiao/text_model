@@ -112,9 +112,9 @@ class XnliProcessor(DataProcessor):
 
     def get_train_examples(self, data_dir):
         """See base class."""
-        en = self._read(os.path.join(data_dir, "en.train"))
-        zh = self._read(os.path.join(data_dir, "zh.train"))
-        label = self._read(os.path.join(data_dir, "label.train"))
+        en = self._read(os.path.join(data_dir, "en.train1"))
+        zh = self._read(os.path.join(data_dir, "zh.train1"))
+        label = self._read(os.path.join(data_dir, "label.train1"))
         examples = []
         for (i, (e, z, l)) in enumerate(zip(en, zh, label)):
             if i == 0:
